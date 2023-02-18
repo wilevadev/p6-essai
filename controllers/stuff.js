@@ -2,7 +2,7 @@ const Sauce = require('../models/Sauce');
 const fs = require('fs');
 
 exports.createSauce = (req, res, next) => {
-  const sauceObject = JSON.parse(req.body.thing);
+  const sauceObject = JSON.parse(req.body.sauce);
   delete sauceObject._id;
   delete sauceObject._userId;
   const sauce = new Sauce({
@@ -62,7 +62,7 @@ exports.deleteSauce = (req, res, next) => {
           } else {
               const filename = sauce.imageUrl.split('/images/')[1];
               fs.unlink(`images/${filename}`, () => {
-                  Thing.deleteOne({_id: req.params.id})
+                  Sauce.deleteOne({_id: req.params.id})
                       .then(() => { res.status(200).json({message: 'Objet supprimé !'})})
                       .catch(error => res.status(401).json({ error }));
               });
@@ -85,4 +85,38 @@ exports.getAllSauces = (req, res, next) => {
       });
     }
   );
+};
+exports.likeSauce = (req, res, next) => {
+  const userId = req.body.userId;
+  const like = req.body.like;
+  Sauce.findOne({_id: req.params.id})
+      .then(sauce => {
+          const alreadyLiked = sauce.usersLiked.includes(userId);
+          const alreadyDisliked = sauce.usersDisliked.includes(userId);
+          let newLikes = sauce.likes;
+          let newDislikes = sauce.dislikes;
+
+          if (like == 1 && !alreadyLiked) { // User likes the sauce
+              newLikes++;
+              sauce.usersLiked.push(userId);
+          } else if (like == -1 && !alreadyDisliked) { // User dislikes the sauce
+              newDislikes++;
+              sauce.usersDisliked.push(userId);
+          } else if (like == 0) { // User cancels the like or dislike
+              if (alreadyLiked) {
+                  newLikes--;
+                  sauce.usersLiked.splice(sauce.usersLiked.indexOf(userId), 1);
+              } else if (alreadyDisliked) {
+                  newDislikes--;
+                  sauce.usersDisliked.splice(sauce.usersDisliked.indexOf(userId), 1);
+              }
+          }
+
+          Sauce.updateOne({ _id: req.params.id }, { likes: newLikes, dislikes: newDislikes, usersLiked: sauce.usersLiked, usersDisliked: sauce.usersDisliked, _id: req.params.id })
+              .then(() => res.status(200).json({message : 'Like updated!'}))
+              .catch(error => res.status(401).json({ error }));
+      })
+      .catch((error) => {
+          res.status(400).json({ error });
+      });
 };
